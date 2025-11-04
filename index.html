@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FonPay Task-Earnings Bot – DB Setup</title>
+<style>
+  body { font-family: system-ui; background: #f9fafb; color: #111; padding: 2rem; }
+  textarea, input { width: 100%; padding: .75rem; margin-top:.5rem; border-radius: .5rem; border:1px solid #ccc; }
+  button { margin-top:1rem; padding: .75rem 1.25rem; background:#2563eb; color:white; border:none; border-radius:.5rem; cursor:pointer; }
+  #result { margin-top:1rem; padding:.75rem; border-radius:.5rem; }
+</style>
+</head>
+<body>
+  <h2>FonPay Task-Earnings Bot Database Setup</h2>
+  <p>Paste your PostgreSQL connection URL below and click <b>Run Setup</b>.</p>
+
+  <textarea id="conn" rows="3" placeholder="postgresql://user:pass@host:5432/db?sslmode=require"></textarea>
+  <button onclick="runSetup()">Run Setup</button>
+
+  <div id="result"></div>
+
+  <script>
+  async function runSetup() {
+    const conn = document.getElementById('conn').value.trim();
+    const result = document.getElementById('result');
+    if(!conn) return alert('Please paste your PostgreSQL URL');
+
+    result.innerHTML = '⏳ Running setup...';
+
+    const sql = `
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  telegram_id BIGINT UNIQUE NOT NULL,
+  username TEXT,
+  coins INTEGER DEFAULT 0,
+  referral_code TEXT,
+  referred_by BIGINT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS tasks (
+  id SERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES users(telegram_id),
+  task_name TEXT,
+  completed BOOLEAN DEFAULT FALSE,
+  reward INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS withdrawals (
+  id SERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES users(telegram_id),
+  amount INTEGER,
+  bank_name TEXT,
+  account_number TEXT,
+  account_name TEXT,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO users (telegram_id, username, coins)
+VALUES (5236441213, 'Admin1', 0),
+       (5725566044, 'Admin2', 0)
+ON CONFLICT (telegram_id) DO NOTHING;`;
+
+    try {
+      const resp = await fetch('https://api.elephantsql.com/api/sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conn, sql })
+      });
+      const data = await resp.text();
+      result.innerHTML = '✅ Tables created successfully.<br>' + data;
+    } catch(e) {
+      result.innerHTML = '❌ Error: ' + e.message;
+    }
+  }
+  </script>
+</body>
+</html>
